@@ -373,7 +373,7 @@
     <header data-share-topbar data-topbar class="z-30 flex h-[58px] shrink-0 items-center gap-2 bg-[#f8fafd] pl-3 pr-4">
       <div data-topbar-brand class="flex h-[58px] w-[226px] shrink-0 items-center gap-2">
         <a href="/" class="flex items-center gap-2 no-underline">
-          <img src="design/logo.png" alt="Ride" class="h-12 w-12 object-contain" />
+          <img src="/design/logo.png" alt="Ride" class="h-12 w-12 object-contain" />
           <span class="text-[24px] font-normal">Ride</span>
         </a>
       </div>

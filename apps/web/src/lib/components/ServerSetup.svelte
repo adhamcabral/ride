@@ -55,7 +55,7 @@
     {/if}
 
     <section class="server-brand">
-      <img src="/ride.png" alt="Ride" />
+      <img src="/design/logo.png" alt="Ride" />
       <div>
         <h1>Conectar ao Ride</h1>
         <p>Informe o endereço do servidor para acessar seus arquivos neste celular.</p>

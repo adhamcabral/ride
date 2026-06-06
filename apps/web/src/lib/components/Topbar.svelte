@@ -55,7 +55,7 @@
     </button>
 
     <a href="/" class="flex items-center gap-2 no-underline">
-      <img src="design/logo.png" alt="Ride" class="h-12 w-12 object-contain" />
+      <img src="/design/logo.png" alt="Ride" class="h-12 w-12 object-contain" />
       <span data-topbar-logo-text class="text-[24px] font-normal text-[#1f1f1f]">Ride</span>
     </a>
   </div>

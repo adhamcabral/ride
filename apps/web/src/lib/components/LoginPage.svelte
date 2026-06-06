@@ -317,7 +317,7 @@
 </div>
 
 {#snippet AppLogo()}
-  <img class="app-logo" src="/ride.png" alt="Ride" />
+  <img class="app-logo" src="/design/logo.png" alt="Ride" />
 {/snippet}
 
 <style>
