@@ -166,6 +166,7 @@
     if (loginStep === 'email') void nextLoginEmail();
     else void submitLoginPassword();
   }
+
 </script>
 
 <div class="login-shell">
@@ -217,22 +218,18 @@
           {#if canCreateFirstAccount}
             {#if setupStep === 'name'}
               <div class="field-stack">
-                <LoginFloatingInput id="setup-first-name" label="Nome" autocomplete="given-name" bind:value={firstName} disabled={loading} />
+                <LoginFloatingInput id="setup-first-name" label="Nome" autocomplete="given-name" bind:value={firstName} disabled={loading} on:enter={submitCurrent} />
                 <LoginFloatingInput
                   id="setup-last-name"
                   label="Sobrenome (opcional)"
                   autocomplete="family-name"
                   bind:value={lastName}
                   disabled={loading}
+                  on:enter={submitCurrent}
                 />
               </div>
             {:else if setupStep === 'email'}
-              <div class="email-choice">
-                <label><span></span><input type="radio" disabled /> cabraladham2@gmail.com</label>
-                <label><span></span><input type="radio" disabled /> adhamcabral383@gmail.com</label>
-                <label class="active"><span></span><input type="radio" checked readonly /> Usar seu e-mail atual</label>
-              </div>
-              <LoginFloatingInput id="setup-email" label="Seu e-mail atual" type="email" autocomplete="email" bind:value={email} disabled={loading} />
+              <LoginFloatingInput id="setup-email" label="Seu e-mail" type="email" autocomplete="email" bind:value={email} disabled={loading} on:enter={submitCurrent} />
               <p class="field-help">Use um endereço de e-mail que você já possui.</p>
             {:else}
               <div class="field-stack">
@@ -243,6 +240,7 @@
                   autocomplete="new-password"
                   bind:value={password}
                   disabled={loading}
+                  on:enter={submitCurrent}
                 />
                 <LoginFloatingInput
                   id="setup-confirm"
@@ -251,6 +249,7 @@
                   autocomplete="new-password"
                   bind:value={confirmPassword}
                   disabled={loading}
+                  on:enter={submitCurrent}
                 />
               </div>
               <label class="show-password">
@@ -267,13 +266,14 @@
               autocomplete="current-password"
               bind:value={password}
               disabled={loading}
+              on:enter={submitCurrent}
             />
             <label class="show-password">
               <input type="checkbox" bind:checked={showPassword} />
               <span>Mostrar senha</span>
             </label>
           {:else}
-            <LoginFloatingInput id="login-email" label="E-mail ou telefone" type="email" autocomplete="email" bind:value={email} disabled={loading} />
+            <LoginFloatingInput id="login-email" label="E-mail ou telefone" type="email" autocomplete="email" bind:value={email} disabled={loading} on:enter={submitCurrent} />
             <p class="login-email-guidance">Preencha com o e-mail cadastrado anteriormente.</p>
           {/if}
 
@@ -474,37 +474,6 @@
     color: #f2b8b5;
     font-size: 13px;
     line-height: 18px;
-  }
-
-  .email-choice {
-    margin-top: -16px;
-    display: grid;
-    border-bottom: 1px solid #3c4043;
-  }
-
-  .email-choice label {
-    height: 58px;
-    border-top: 1px solid #3c4043;
-    color: #e8eaed;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    font-size: 16px;
-  }
-
-  .email-choice input {
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    border: 2px solid #e8eaed;
-    border-radius: 999px;
-    margin: 0;
-  }
-
-  .email-choice .active input {
-    border-color: #a8c7fa;
-    box-shadow: inset 0 0 0 4px #0e0e0e;
-    background: #a8c7fa;
   }
 
   .field-help {

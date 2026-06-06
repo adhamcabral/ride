@@ -46,8 +46,18 @@ export function getConfiguredDriveServerUrl() {
   return stored ? trimTrailingSlash(stored) : null;
 }
 
+function isLoopbackServerUrl(value: string) {
+  try {
+    const hostname = new URL(value).hostname;
+    return ['127.0.0.1', 'localhost', '::1'].includes(hostname);
+  } catch {
+    return true;
+  }
+}
+
 export function hasConfiguredDriveServerUrl() {
-  return Boolean(getConfiguredDriveServerUrl());
+  if (getConfiguredDriveServerUrl()) return true;
+  return isNativeMobileApp() && !isLoopbackServerUrl(DEFAULT_API_URL);
 }
 
 export function getApiUrl() {

@@ -1,10 +1,20 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte';
+
   export let id: string;
   export let label: string;
   export let type = 'text';
   export let autocomplete: any = '';
   export let value = '';
   export let disabled = false;
+
+  const dispatch = createEventDispatcher<{ enter: void }>();
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    dispatch('enter');
+  }
 </script>
 
 <label class="float-field" for={id}>
@@ -15,6 +25,7 @@
     placeholder=" "
     bind:value
     {disabled}
+    on:keydown={handleKeydown}
   />
   <span>{label}</span>
 </label>
