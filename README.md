@@ -10,6 +10,7 @@ Use it as a private Drive-style workspace for files, folders, and office documen
 - Docker and Docker Compose
 - Node.js 24+
 - npm 10+
+- Internet access on first start to pull Docker images
 - Optional: UFW for firewall rules
 
 ## Start
@@ -18,6 +19,8 @@ Use it as a private Drive-style workspace for files, folders, and office documen
 cp .env.example .env
 npm run dev
 ```
+
+The first start downloads the local ONLYOFFICE Docs Docker image if it is not already available. Ride keeps ONLYOFFICE running locally in Docker; the large image archive is not committed to Git.
 
 Open:
 
@@ -41,6 +44,12 @@ Stop:
 
 ```bash
 npm run docker:down
+```
+
+To pre-cache the ONLYOFFICE base image for later local reuse:
+
+```bash
+npm run docker:vendor-office
 ```
 
 ## Ports
