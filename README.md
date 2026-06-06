@@ -2,7 +2,6 @@
 
 <p align="center">
 <img src="design/logotipo.png" width="300">
-<h1 align="center">Ride</h1>
 </p>
 <h3 align="center">High performance self-hosted file management solution</h3>
 
