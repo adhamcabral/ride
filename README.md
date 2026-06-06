@@ -21,6 +21,7 @@ npm run dev
 ```
 
 The first start downloads the local ONLYOFFICE Docs Docker image if it is not already available. Ride keeps ONLYOFFICE running locally in Docker; the large image archive is not committed to Git.
+On a clean Docker install, the stack also prepares Docker volumes for `node_modules` before starting the Web and API containers.
 
 Open:
 
@@ -45,6 +46,16 @@ Stop:
 ```bash
 npm run docker:down
 ```
+
+## First Account and Local Data
+
+On the first start, Ride opens the account creation screen. The API stores local SQLite data and uploaded objects in:
+
+```txt
+apps/api/data
+```
+
+That folder is ignored by Git. To reset Ride back to first-account setup, stop the stack and remove that local data folder. Docker dependency volumes can be recreated safely; they do not contain Ride accounts or files.
 
 To pre-cache the ONLYOFFICE base image for later local reuse:
 

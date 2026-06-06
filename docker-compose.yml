@@ -1,4 +1,18 @@
 services:
+  deps:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile.dev
+    image: ride/app-dev:local
+    working_dir: /workspace
+    command: sh docker/app/ensure-node-modules.sh
+    restart: "no"
+    volumes:
+      - .:/workspace
+      - ride-node-modules:/workspace/node_modules
+      - ride-api-node-modules:/workspace/apps/api/node_modules
+      - ride-web-node-modules:/workspace/apps/web/node_modules
+
   api:
     build:
       context: .
@@ -29,10 +43,15 @@ services:
     volumes:
       - .:/workspace
       - ride-node-modules:/workspace/node_modules
+      - ride-api-node-modules:/workspace/apps/api/node_modules
+      - ride-web-node-modules:/workspace/apps/web/node_modules
       - ride-api-dist:/workspace/apps/api/dist
       - ${RIDE_BACKUP_DIR:-./apps/api/data/backups}:/backups
     depends_on:
-      - onlyoffice
+      deps:
+        condition: service_completed_successfully
+      onlyoffice:
+        condition: service_started
 
   web:
     build:
@@ -56,9 +75,14 @@ services:
     volumes:
       - .:/workspace
       - ride-node-modules:/workspace/node_modules
+      - ride-api-node-modules:/workspace/apps/api/node_modules
+      - ride-web-node-modules:/workspace/apps/web/node_modules
       - ride-web-svelte-kit:/workspace/apps/web/.svelte-kit
     depends_on:
-      - api
+      deps:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
 
   onlyoffice:
     image: ${ONLYOFFICE_IMAGE:-ride/onlyoffice-documentserver:local}
@@ -83,6 +107,8 @@ services:
 
 volumes:
   ride-node-modules:
+  ride-api-node-modules:
+  ride-web-node-modules:
   ride-api-dist:
   ride-web-svelte-kit:
   onlyoffice-data:

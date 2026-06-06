@@ -56,12 +56,14 @@ function isLoopbackServerUrl(value: string) {
 }
 
 export function hasConfiguredDriveServerUrl() {
+  if (!isNativeMobileApp()) return false;
   if (getConfiguredDriveServerUrl()) return true;
-  return isNativeMobileApp() && !isLoopbackServerUrl(DEFAULT_API_URL);
+  return !isLoopbackServerUrl(DEFAULT_API_URL);
 }
 
 export function getApiUrl() {
-  return getConfiguredDriveServerUrl() ?? trimTrailingSlash(DEFAULT_API_URL);
+  if (isNativeMobileApp()) return getConfiguredDriveServerUrl() ?? trimTrailingSlash(DEFAULT_API_URL);
+  return trimTrailingSlash(DEFAULT_API_URL);
 }
 
 export function getDriveServerDisplayUrl() {
