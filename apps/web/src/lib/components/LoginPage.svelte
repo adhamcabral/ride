@@ -22,6 +22,7 @@
 
   let setupRequired = false;
   let checkingSetup = true;
+  let setupCheckError = '';
   let loginStep: LoginStep = 'email';
   let setupStep: SetupStep = 'name';
   let firstName = '';
@@ -46,7 +47,14 @@
   $: loginTitle =
     (loginDisplayNameEmail === normalizedEmail ? loginDisplayName : '') || knownLoginUser?.name || email.trim();
 
-  onMount(async () => {
+  onMount(() => {
+    void checkSetupStatus();
+  });
+
+  async function checkSetupStatus() {
+    checkingSetup = true;
+    setupCheckError = '';
+
     if (!allowSetup) {
       setupRequired = false;
       checkingSetup = false;
@@ -58,12 +66,13 @@
     try {
       const status = await getSetupStatus();
       setupRequired = status.setupRequired;
-    } catch {
+    } catch (ex) {
       setupRequired = false;
+      setupCheckError = ex instanceof Error ? ex.message : 'Não foi possível verificar a configuração inicial.';
     } finally {
       checkingSetup = false;
     }
-  });
+  }
 
   async function resolveLoginDisplayName() {
     loginDisplayNameEmail = normalizedEmail;
@@ -178,6 +187,22 @@
           <h1>Faça login</h1>
           <p>Verificando o Ride...</p>
         </div>
+      </section>
+    {:else if setupCheckError}
+      <section class="login-card">
+        <div class="login-left">
+          {@render AppLogo()}
+          <h1>Configurando o Ride</h1>
+          <p>Não foi possível confirmar se esta instalação já possui uma conta.</p>
+        </div>
+        <section class="login-right">
+          <div class="form-error">{setupCheckError}</div>
+          <div class="actions">
+            <button class="primary-button" type="button" on:click={checkSetupStatus}>
+              Tentar novamente
+            </button>
+          </div>
+        </section>
       </section>
     {:else}
       <form class="login-card" on:submit|preventDefault={submitCurrent}>

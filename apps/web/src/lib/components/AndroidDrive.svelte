@@ -484,6 +484,10 @@
     return '';
   }
 
+  function hideBrokenAvatar(event: Event) {
+    (event.currentTarget as HTMLImageElement).style.display = 'none';
+  }
+
   function avatarKey(user = displayAccount) {
     return `${user?.id ?? activeAccountId}-${androidAvatarVersion}-${accountAvatar(user)}`;
   }
@@ -984,7 +988,7 @@
         {#key avatarKey()}
           <span class="android-avatar-fallback">{initials(displayAccount)}</span>
           {#if accountAvatar()}
-            <img src={accountAvatar()} alt="" on:error={(event) => (event.currentTarget.style.display = 'none')} />
+            <img src={accountAvatar()} alt="" on:error={hideBrokenAvatar} />
           {/if}
         {/key}
       </button>
