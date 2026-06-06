@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ride ONLYOFFICE</title>
+    <style>
+      html,
+      body,
+      #editor {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #202124;
+      }
+
+      #status {
+        position: fixed;
+        left: 50%;
+        top: 20px;
+        z-index: 20;
+        max-width: min(640px, calc(100vw - 32px));
+        transform: translateX(-50%);
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        font-size: 14px;
+        line-height: 1.4;
+        padding: 8px 18px;
+        text-align: center;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+      }
+
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Carregando editor...</div>
+    <div id="editor"></div>
+    <script>
+      const status = document.getElementById('status');
+      let editor = null;
+      let appReadyHandled = false;
+      let documentReadyHandled = false;
+      let replayingOfficeMessage = false;
+      let connectionWarningStartedAt = 0;
+      let lastConnectionWarningAt = 0;
+      const CONNECTION_WARNING_GRACE_MS = 60000;
+      const CONNECTION_WARNING_RESET_MS = 15000;
+      const CONNECTION_WARNING_PATTERN =
+        /perda de conex|voce ainda pode exibir|você ainda pode exibir|download ou imprimir|connection lost|you can still view|lost connection|conexi[oó]n perdida|puede ver el documento/i;
+      const SAVE_WARNING_PATTERN =
+        /erro na grava[cç][aã]o|op[cç][aã]o ['"]?baixar como['"]?|tente novamente mais tarde|error (while )?saving|download as|c[oó]pia de seguran[cç]a|n[aã]o foi salvo no armazenamento|salv[aá]-lo em uma unidade|opened from a backup copy|not saved to storage|save it to a drive/i;
+
+      function isSuppressedOfficeWarning(message) {
+        return SAVE_WARNING_PATTERN.test(String(message || ''));
+      }
+
+      function setStatus(message) {
+        if (status) status.textContent = message;
+        postParent('ride-office-status', { message });
+      }
+
+      function fail(message) {
+        setStatus(message);
+        if (status) status.style.background = 'rgba(124, 23, 23, 0.92)';
+        postParent('ride-office-error', { message });
+      }
+
+      function postParent(type, detail) {
+        if (window.parent === window) return;
+        try {
+          window.parent.postMessage({ type, ...(detail || {}) }, '*');
+        } catch {}
+      }
+
+      function payloadStorageKey() {
+        const session = new URLSearchParams(window.location.search).get('session');
+        return session ? `ride:onlyoffice:${session}` : '';
+      }
+
+      function decodeOfficePayload(encoded) {
+        const padded = encoded.padEnd(encoded.length + ((4 - (encoded.length % 4)) % 4), '=');
+        const binary = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+        return new TextDecoder().decode(bytes);
+      }
+
+      function decodePayload() {
+        const storageKey = payloadStorageKey();
+        const encoded = window.location.hash.slice(1);
+        if (encoded) {
+          const payload = decodeOfficePayload(encoded);
+          if (storageKey) {
+            try {
+              sessionStorage.setItem(storageKey, payload);
+            } catch {}
+          }
+          return JSON.parse(payload);
+        }
+
+        if (storageKey) {
+          try {
+            const storedPayload = sessionStorage.getItem(storageKey);
+            if (storedPayload) return JSON.parse(storedPayload);
+          } catch {}
+        }
+
+        throw new Error('Configuracao do editor ausente. Abra o arquivo novamente pelo Ride.');
+      }
+
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          const timer = setTimeout(() => {
+            script.remove();
+            reject(new Error('Tempo esgotado ao carregar o ONLYOFFICE.'));
+          }, 20000);
+          script.src = src;
+          script.async = true;
+          script.onload = () => {
+            clearTimeout(timer);
+            if (window.DocsAPI && window.DocsAPI.DocEditor) resolve();
+            else reject(new Error('DocsAPI nao ficou disponivel.'));
+          };
+          script.onerror = () => {
+            clearTimeout(timer);
+            script.remove();
+            reject(new Error('Nao foi possivel carregar o script do ONLYOFFICE.'));
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      function withEvents(config) {
+        const events = config && config.events && typeof config.events === 'object' ? config.events : {};
+        return {
+          ...config,
+          width: '100%',
+          height: '100%',
+          events: {
+            ...events,
+            onAppReady: () => {
+              appReadyHandled = true;
+              setStatus('Aplicativo pronto. Abrindo documento...');
+            },
+            onDocumentReady: () => {
+              documentReadyHandled = true;
+              if (status) status.remove();
+              postParent('ride-office-ready');
+            },
+            onRequestClose: () => {
+              postParent('ride-office-close');
+              closeEditor();
+            },
+            onError: (event) => {
+              const message =
+                event && typeof event.data === 'string'
+                  ? event.data
+                  : 'O ONLYOFFICE encontrou um erro ao abrir este arquivo.';
+              fail(message);
+            },
+            onWarning: (event) => {
+              if (event && typeof event.data === 'string') setStatus(event.data);
+            }
+          }
+        };
+      }
+
+      function parseOfficeMessage(data) {
+        if (!data) return null;
+        if (typeof data === 'string') {
+          try {
+            return JSON.parse(data);
+          } catch {
+            return null;
+          }
+        }
+        return typeof data === 'object' ? data : null;
+      }
+
+      function sameOriginDocuments(win = window, documents = []) {
+        try {
+          if (win.document) documents.push(win.document);
+          for (let index = 0; index < win.frames.length; index += 1) {
+            sameOriginDocuments(win.frames[index], documents);
+          }
+        } catch {}
+        return documents;
+      }
+
+      function patchOfficeAlerts(win = window) {
+        try {
+          if (!win || win.__rideAlertsPatched) return;
+          const originalAlert = win.alert;
+          win.alert = function(message) {
+            if (isSuppressedOfficeWarning(message)) return;
+            return originalAlert.call(win, message);
+          };
+          win.__rideAlertsPatched = true;
+        } catch {}
+      }
+
+      function patchSameOriginAlerts(win = window) {
+        try {
+          patchOfficeAlerts(win);
+          for (let index = 0; index < win.frames.length; index += 1) {
+            patchSameOriginAlerts(win.frames[index]);
+          }
+        } catch {}
+      }
+
+      function findWarningRoot(doc, pattern) {
+        const bodyText = doc.body && doc.body.innerText ? doc.body.innerText : '';
+        if (!pattern.test(bodyText)) return null;
+        const candidates = Array.from(
+          doc.querySelectorAll('[role="dialog"], .asc-window, .modal, .dialog, .window, .box, div')
+        );
+        const hasControl = (element) =>
+          element.querySelector('button, input[type="button"], .btn, [role="button"]');
+        const hasWarning = (element) => {
+          const text = element.innerText || '';
+          return text.length > 20 && text.length < 2500 && pattern.test(text);
+        };
+        return (
+          candidates.find((element) => hasWarning(element) && hasControl(element)) ||
+          candidates.find((element) => hasWarning(element)) ||
+          doc.body
+        );
+      }
+
+      function findConnectionWarningRoot(doc) {
+        return findWarningRoot(doc, CONNECTION_WARNING_PATTERN);
+      }
+
+      function findSaveWarningRoot(doc) {
+        return findWarningRoot(doc, SAVE_WARNING_PATTERN);
+      }
+
+      function dismissConnectionWarning(root) {
+        const controls = Array.from(root.querySelectorAll('button, input[type="button"], .btn, [role="button"]'));
+        const ok = controls.find((control) => /^(ok|okay|aceitar|entendi)$/i.test((control.innerText || control.value || '').trim()));
+        if (ok && typeof ok.click === 'function') {
+          ok.click();
+          return;
+        }
+        root.style.display = 'none';
+        root.setAttribute('aria-hidden', 'true');
+      }
+
+      function suppressBenignSaveWarnings() {
+        for (const doc of sameOriginDocuments()) {
+          const root = findSaveWarningRoot(doc);
+          if (root) dismissConnectionWarning(root);
+        }
+      }
+
+      function suppressShortConnectionWarnings() {
+        patchSameOriginAlerts();
+        suppressBenignSaveWarnings();
+        const now = Date.now();
+        let found = false;
+        for (const doc of sameOriginDocuments()) {
+          const root = findConnectionWarningRoot(doc);
+          if (!root) continue;
+          found = true;
+          if (!connectionWarningStartedAt) connectionWarningStartedAt = now;
+          lastConnectionWarningAt = now;
+          if (now - connectionWarningStartedAt < CONNECTION_WARNING_GRACE_MS) {
+            dismissConnectionWarning(root);
+          }
+        }
+        if (!found && lastConnectionWarningAt && now - lastConnectionWarningAt > CONNECTION_WARNING_RESET_MS) {
+          connectionWarningStartedAt = 0;
+          lastConnectionWarningAt = 0;
+        }
+      }
+
+      window.addEventListener(
+        'message',
+        (event) => {
+          if (replayingOfficeMessage || event.origin !== window.location.origin) return;
+          const data = parseOfficeMessage(event.data);
+          if (!data || data.event !== 'onAppReady' || data.frameEditorId !== 'editor') return;
+          setTimeout(() => {
+            if (appReadyHandled || documentReadyHandled) return;
+            replayingOfficeMessage = true;
+            try {
+              setStatus('Aplicativo pronto. Sincronizando sessão...');
+              window.dispatchEvent(new MessageEvent('message', { data: event.data, origin: event.origin, source: event.source }));
+            } finally {
+              replayingOfficeMessage = false;
+            }
+          }, 250);
+        },
+        true
+      );
+
+      function closeEditor() {
+        try {
+          if (editor && editor.destroyEditor) editor.destroyEditor();
+        } catch {}
+        window.close();
+      }
+
+      setInterval(suppressShortConnectionWarnings, 1000);
+      window.addEventListener('beforeunload', () => {
+        try {
+          if (editor && editor.destroyEditor) editor.destroyEditor();
+        } catch {}
+      });
+      window.addEventListener('error', (event) => {
+        const file = event.filename ? event.filename.split('/').pop() : '';
+        fail(`Erro JavaScript no ONLYOFFICE: ${event.message || 'erro desconhecido'}${file ? ` (${file}:${event.lineno || 0})` : ''}`);
+      });
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        fail(`Falha interna do ONLYOFFICE: ${reason && reason.message ? reason.message : String(reason || 'promessa rejeitada')}`);
+      });
+
+      (async () => {
+        try {
+          const payload = decodePayload();
+          if (!payload || !payload.config) throw new Error('Configuracao do ONLYOFFICE invalida.');
+          setStatus('Carregando script do ONLYOFFICE...');
+          await loadScript('/web-apps/apps/api/documents/api.js');
+          setStatus('Script carregado. Instanciando editor...');
+          editor = new window.DocsAPI.DocEditor('editor', withEvents(payload.config));
+          setStatus('Editor instanciado. Aguardando sessao...');
+          setTimeout(() => {
+            if (appReadyHandled || documentReadyHandled) return;
+            setStatus('Aguardando app interno do ONLYOFFICE...');
+          }, 6000);
+        } catch (error) {
+          fail(error instanceof Error ? error.message : 'Nao foi possivel abrir o ONLYOFFICE.');
+        }
+      })();
+    </script>
+  </body>
+</html>

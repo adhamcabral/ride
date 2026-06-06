@@ -1,0 +1,88 @@
+# Dependencies
+node_modules/
+apps/*/node_modules/
+
+# Local environment
+.env
+.env.*
+!.env.example
+!.env.mobile.example
+!apps/**/.env.example
+
+# Ride local data
+apps/api/data/
+data/
+backups/
+restore/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.upload
+ride-full-*.tar.*
+drive-full-*.tar.*
+
+# Build output
+dist/
+build/
+.svelte-kit/
+.vite/
+apps/api/dist/
+apps/web/build/
+apps/web/.svelte-kit/
+apps/web/.vite/
+
+# Android output and local SDK config
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/app/debug/
+android/local.properties
+android/captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Test and coverage output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Logs and runtime files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.seed
+
+# Tooling cache
+*.tsbuildinfo
+.eslintcache
+.prettier-cache
+.cache/
+.turbo/
+
+# Docker bind-mounted service data
+docker/onlyoffice/data/
+docker/onlyoffice/logs/
+docker/onlyoffice/cache/
+docker/onlyoffice/vendor/*
+!docker/onlyoffice/vendor/.gitkeep
+
+# OS, editor, and local agent files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+.agents/
+.claude/
+.codex/

@@ -1,0 +1,85 @@
+# Ride
+
+Ride is a self-hosted file manager with users, sharing, search, previews, backups, and ONLYOFFICE editing.
+It runs as a local Docker stack with Web, API, SQLite storage, and ONLYOFFICE Docs.
+Use it as a private Drive-style workspace for files, folders, and office documents.
+
+## Requirements
+
+- Linux server or desktop
+- Docker and Docker Compose
+- Node.js 24+
+- npm 10+
+- Optional: UFW for firewall rules
+
+## Start
+
+```bash
+cp .env.example .env
+npm run dev
+```
+
+Open:
+
+```txt
+http://127.0.0.1:5173
+```
+
+For LAN or domain access, edit `.env` before starting:
+
+```env
+PUBLIC_APP_URL=http://your-domain-or-ip:5173
+PUBLIC_API_URL=http://your-domain-or-ip:3333/api
+VITE_API_URL=http://your-domain-or-ip:3333/api
+CORS_ORIGINS=http://your-domain-or-ip:5173
+ONLYOFFICE_DOCUMENT_SERVER_URL=http://your-domain-or-ip:8082
+RIDE_ACCESS_TICKET_SECRET=change-this
+ONLYOFFICE_JWT_SECRET=change-this-too
+```
+
+Stop:
+
+```bash
+npm run docker:down
+```
+
+## Ports
+
+```txt
+5173  Web
+3333  API
+8082  ONLYOFFICE
+```
+
+UFW:
+
+```bash
+sudo ufw allow 5173/tcp
+sudo ufw allow 3333/tcp
+sudo ufw allow 8082/tcp
+```
+
+## Backup Volume
+
+Create a host folder:
+
+```bash
+sudo mkdir -p /srv/ride-backups
+sudo chown -R "$USER:$USER" /srv/ride-backups
+```
+
+Set it in `.env`:
+
+```env
+RIDE_BACKUP_DIR=/srv/ride-backups
+```
+
+Start Ride, then go to `Settings > Backups` and set the default backup location to:
+
+```txt
+/backups
+```
+
+## Author
+
+Created and maintained by Adham Cabral.

@@ -1,0 +1,51 @@
+{
+  "name": "ride",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Ride file manager and office workspace.",
+  "author": "Adham Cabral",
+  "license": "MIT",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run docker:up",
+    "dev:local": "concurrently \"npm run dev -w @ride/api\" \"npm run dev -w @ride/web\"",
+    "docker:vendor-office": "sh docker/onlyoffice/scripts/vendor-base.sh",
+    "docker:ensure-office": "sh docker/onlyoffice/scripts/ensure-base.sh",
+    "docker:up": "npm run docker:ensure-office && docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:ps": "docker compose ps",
+    "admin:promote": "node scripts/promote-admin.js",
+    "mobile:init": "npx cap add android",
+    "mobile:sync": "NODE_OPTIONS=--max-old-space-size=1024 npm run build -w @ride/web && NODE_OPTIONS=--max-old-space-size=1024 npx cap sync android",
+    "mobile:apk": "npm run mobile:sync && cd android && JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk} ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk} ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-/opt/android-sdk} ./gradlew --no-daemon --max-workers=1 assembleDebug",
+    "build": "npm run build -w @ride/api && npm run build -w @ride/web",
+    "test": "npm run test -w @ride/api",
+    "lint": "npm run lint -w @ride/web",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/core": "^7.4.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "concurrently": "^9.1.0",
+    "prettier": "^3.3.3"
+  },
+  "overrides": {
+    "cookie": "0.7.2",
+    "qs": "6.15.2",
+    "vite": "6.4.2",
+    "esbuild": "0.25.12",
+    "@sveltejs/vite-plugin-svelte": "5.1.1",
+    "@sveltejs/vite-plugin-svelte-inspector": "4.0.1"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  }
+}

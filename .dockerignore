@@ -1,0 +1,11 @@
+node_modules
+apps/*/node_modules
+apps/api/data
+apps/api/dist
+apps/web/.svelte-kit
+apps/web/build
+docker/onlyoffice/vendor/*.tar
+docker/onlyoffice/vendor/*.tar.*
+.git
+.env
+npm-debug.log*

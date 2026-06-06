@@ -1,0 +1,4 @@
+vendor/
+*.tar
+*.tar.gz
+*.tar.xz
