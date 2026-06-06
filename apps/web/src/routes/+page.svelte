@@ -3620,7 +3620,7 @@
 {:else if !authChecked}
   <!-- Loading splash -->
   <div class="flex h-screen items-center justify-center bg-white">
-    <img src="/ride.png" alt="Ride" class="h-28 w-28 animate-pulse object-contain" />
+    <img src="design/logo.png" alt="Ride" class="h-28 w-28 animate-pulse object-contain" />
   </div>
 {:else if !currentUser || addingAccount}
   {#key loginPageKey}

@@ -1,8 +1,18 @@
-# Ride
 
+
+<p align="center">
+<img src="design/logotipo.png" width="300">
+<h1 align="center">Ride</h1>
+</p>
+<h3 align="center">High performance self-hosted file management solution</h3>
+
+<p align="center" >
 Ride is a self-hosted file manager with users, sharing, search, previews, backups, and ONLYOFFICE editing.
 It runs as a local Docker stack with Web, API, SQLite storage, and ONLYOFFICE Docs.
 Use it as a private Drive-style workspace for files, folders, and office documents.
+</p>
+<hr>
+
 
 ## Requirements
 
@@ -13,7 +23,7 @@ Use it as a private Drive-style workspace for files, folders, and office documen
 - Internet access on first start to pull Docker images
 - Optional: UFW for firewall rules
 
-## Start
+## Fast Start
 
 ```bash
 cp .env.example .env
