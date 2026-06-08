@@ -103,7 +103,7 @@ Set it in `.env`:
 RIDE_BACKUP_DIR=/srv/ride-backups
 ```
 
-Start Ride, then go to `Settings > Backups` and set the default backup location to:
+Start Ride, then go to `Settings > Backups` and set the default backup location to other disk:
 
 ```txt
 /backups
