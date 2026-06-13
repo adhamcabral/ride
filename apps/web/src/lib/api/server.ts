@@ -2,6 +2,8 @@ const SERVER_URL_KEY = 'ride:server-url';
 
 const DEFAULT_API_URL = import.meta.env.VITE_API_URL ?? '/api';
 const DEFAULT_WEB_PORT = import.meta.env.VITE_WEB_PORT ?? '3443';
+const NATIVE_DEFAULT_PROTOCOL = 'https';
+const NATIVE_DEFAULT_PORT = import.meta.env.VITE_NATIVE_WEB_PORT ?? '3443';
 
 function canUseStorage() {
   return typeof localStorage !== 'undefined';
@@ -9,10 +11,6 @@ function canUseStorage() {
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '');
-}
-
-function isAbsoluteHttpUrl(value: string) {
-  return /^https?:\/\//i.test(value);
 }
 
 function currentOrigin() {
@@ -33,7 +31,8 @@ export function isNativeMobileApp() {
 export function normalizeDriveServerUrl(value: string) {
   const raw = value.trim();
   if (!raw) throw new Error('Informe o endereço do servidor.');
-  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+  const hasProtocol = /^https?:\/\//i.test(raw);
+  const withProtocol = hasProtocol ? raw : `${isNativeMobileApp() ? NATIVE_DEFAULT_PROTOCOL : 'http'}://${raw}`;
   let parsed: URL;
   try {
     parsed = new URL(withProtocol);
@@ -42,6 +41,9 @@ export function normalizeDriveServerUrl(value: string) {
   }
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     throw new Error('Use um endereço começando com http:// ou https://.');
+  }
+  if (isNativeMobileApp() && !hasProtocol && !parsed.port && NATIVE_DEFAULT_PORT) {
+    parsed.port = NATIVE_DEFAULT_PORT;
   }
   const pathname = trimTrailingSlash(parsed.pathname);
   parsed.pathname = pathname.endsWith('/api') ? pathname : `${pathname}/api`;
@@ -56,27 +58,16 @@ export function getConfiguredDriveServerUrl() {
   return stored ? trimTrailingSlash(stored) : null;
 }
 
-function isLoopbackServerUrl(value: string) {
-  if (!isAbsoluteHttpUrl(value)) return true;
-  try {
-    const hostname = new URL(value).hostname;
-    return ['127.0.0.1', 'localhost', '::1'].includes(hostname);
-  } catch {
-    return true;
-  }
-}
-
 export function hasConfiguredDriveServerUrl() {
   if (!isNativeMobileApp()) return false;
-  if (getConfiguredDriveServerUrl()) return true;
-  return !isLoopbackServerUrl(DEFAULT_API_URL);
+  return Boolean(getConfiguredDriveServerUrl());
 }
 
 export function getApiUrl() {
   if (isNativeMobileApp()) {
     const configured = getConfiguredDriveServerUrl();
     if (configured) return configured;
-    return isAbsoluteHttpUrl(DEFAULT_API_URL) ? trimTrailingSlash(DEFAULT_API_URL) : '';
+    return '';
   }
   return trimTrailingSlash(DEFAULT_API_URL);
 }

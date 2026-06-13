@@ -38,7 +38,7 @@ Open:
 https://127.0.0.1:3443
 ```
 
-The default certificate is self-signed, so browsers will show a trust warning until you trust or replace the certificate.
+The default certificate is signed by Ride's local CA, so browsers and Android will not trust it until you install/trust the local CA certificate.
 If certificate generation fails, `npm run dev` continues in HTTP fallback mode at `http://127.0.0.1:5173`.
 
 For LAN or domain access, edit `.env` before starting and include every hostname/IP that browsers will use:
@@ -60,6 +60,20 @@ Then regenerate the certificate:
 FORCE_RENEW=1 npm run https:certs
 npm run dev
 ```
+
+For Android, install the generated CA certificate on the phone:
+
+```txt
+docker/proxy/certs/ride-local-ca.crt
+```
+
+After installing it, open the Android app and enter the PC LAN address, for example:
+
+```txt
+192.168.1.199
+```
+
+The app completes that as `https://192.168.1.199:3443/api`. The IP/domain entered in the app must also be present in `RIDE_HTTPS_HOSTS`, otherwise Android will reject the certificate.
 
 Stop:
 
