@@ -73,13 +73,13 @@
         bind:value={serverUrl}
         inputmode="url"
         autocomplete="url"
-        placeholder="https://192.168.0.10:3443"
+        placeholder="http://192.168.0.10:3333"
         disabled={loading}
       />
 
       <p class="server-help">
-        Use o IP, domínio ou porta HTTPS onde o Ride está acessível pelo Android. Se você digitar só o IP, o app
-        usa a porta <strong>3443</strong> e adiciona <strong>/api</strong> automaticamente.
+        Use o IP do servidor na rede local. No Android, se você digitar só o IP, o app usa
+        <strong>http://IP:3333/api</strong> automaticamente.
       </p>
 
       {#if normalizedPreview}

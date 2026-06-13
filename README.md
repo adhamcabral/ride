@@ -38,7 +38,7 @@ Open:
 https://127.0.0.1:3443
 ```
 
-The default certificate is signed by Ride's local CA, so browsers and Android will not trust it until you install/trust the local CA certificate.
+The default certificate is signed by Ride's local CA, so browsers will show a trust warning until you trust or replace the certificate.
 If certificate generation fails, `npm run dev` continues in HTTP fallback mode at `http://127.0.0.1:5173`.
 
 For LAN or domain access, edit `.env` before starting and include every hostname/IP that browsers will use:
@@ -61,19 +61,13 @@ FORCE_RENEW=1 npm run https:certs
 npm run dev
 ```
 
-For Android, install the generated CA certificate on the phone:
-
-```txt
-docker/proxy/certs/ride-local-ca.crt
-```
-
-After installing it, open the Android app and enter the PC LAN address, for example:
+For Android, the app uses the API directly over HTTP to avoid local certificate setup. Set `API_BIND_ADDRESS=0.0.0.0`, keep `API_HOST_PORT=3333`, restart Ride, then enter the PC LAN address in the app:
 
 ```txt
 192.168.1.199
 ```
 
-The app completes that as `https://192.168.1.199:3443/api`. The IP/domain entered in the app must also be present in `RIDE_HTTPS_HOSTS`, otherwise Android will reject the certificate.
+The app completes that as `http://192.168.1.199:3333/api`. Do not use `127.0.0.1` on the phone because it points to the phone itself.
 
 Stop:
 
@@ -138,11 +132,16 @@ Ride exposes only two public HTTPS ports by default:
 8443  ONLYOFFICE Docs
 ```
 
-The Docker-only development ports stay bound to localhost:
+For Android on the same LAN, expose the API HTTP port:
+
+```txt
+3333  API for Android app
+```
+
+The Docker-only development ports can stay bound to localhost when Android access is not needed:
 
 ```txt
 5173  Web dev server
-3333  API
 8082  ONLYOFFICE HTTP
 ```
 
@@ -204,8 +203,8 @@ npm run docker:vendor-office
 ```txt
 3443  HTTPS Web + API
 8443  HTTPS ONLYOFFICE
+3333  HTTP API for Android LAN access
 5173  Web localhost fallback
-3333  API localhost fallback
 8082  ONLYOFFICE localhost fallback
 ```
 
@@ -214,6 +213,7 @@ UFW:
 ```bash
 sudo ufw allow 3443/tcp
 sudo ufw allow 8443/tcp
+sudo ufw allow from 192.168.1.0/24 to any port 3333 proto tcp
 ```
 
 ## Backup Volume

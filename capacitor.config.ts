@@ -7,10 +7,10 @@ const config: CapacitorConfig = {
   bundledWebRuntime: false,
   server: {
     androidScheme: 'https',
-    cleartext: false
+    cleartext: true
   },
   android: {
-    allowMixedContent: false
+    allowMixedContent: true
   }
 };
 

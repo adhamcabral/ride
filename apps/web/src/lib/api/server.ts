@@ -2,8 +2,8 @@ const SERVER_URL_KEY = 'ride:server-url';
 
 const DEFAULT_API_URL = import.meta.env.VITE_API_URL ?? '/api';
 const DEFAULT_WEB_PORT = import.meta.env.VITE_WEB_PORT ?? '3443';
-const NATIVE_DEFAULT_PROTOCOL = 'https';
-const NATIVE_DEFAULT_PORT = import.meta.env.VITE_NATIVE_WEB_PORT ?? '3443';
+const NATIVE_DEFAULT_PROTOCOL = 'http';
+const NATIVE_DEFAULT_PORT = import.meta.env.VITE_NATIVE_API_PORT ?? '3333';
 
 function canUseStorage() {
   return typeof localStorage !== 'undefined';
@@ -88,7 +88,10 @@ export function getPublicAppUrl() {
   const parsed = new URL(getDriveServerDisplayUrl());
   parsed.search = '';
   parsed.hash = '';
-  if (parsed.port === '3333' && DEFAULT_WEB_PORT) parsed.port = DEFAULT_WEB_PORT;
+  if (parsed.port === '3333' && DEFAULT_WEB_PORT) {
+    parsed.protocol = 'https:';
+    parsed.port = DEFAULT_WEB_PORT;
+  }
   return trimTrailingSlash(parsed.toString());
 }
 
