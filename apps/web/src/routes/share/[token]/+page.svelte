@@ -5,6 +5,8 @@
   import FileGrid from '$lib/components/FileGrid.svelte';
   import FileIcon from '$lib/components/FileIcon.svelte';
   import LoginPage from '$lib/components/LoginPage.svelte';
+  import { isOfficeFile } from '$lib/office';
+  import { buildOnlyOfficeStandaloneUrl, normalizeOnlyOfficeDocumentServerUrl } from '$lib/office-host';
   import {
     createSharedFolder,
     deleteSharedItem,
@@ -160,7 +162,34 @@
       void openFolder(item);
       return;
     }
+    if (shouldOpenOffice(item)) {
+      const target = window.open('about:blank', '_blank');
+      void openSharedOfficeInOnlyOffice(item, target);
+      return;
+    }
     previewItem = item;
+  }
+
+  function shouldOpenOffice(item: DriveItem) {
+    if (item.type !== 'file') return false;
+    const extension = (item.extension || item.name.split('.').pop() || '').toLowerCase();
+    return isOfficeFile(extension, item.mimeType || '');
+  }
+
+  async function openSharedOfficeInOnlyOffice(item: DriveItem, target: Window | null) {
+    try {
+      const response = await getSharedOfficeConfig(token, item.id, canEdit ? 'edit' : 'view');
+      if (!response.enabled || !response.documentServerUrl || !response.config) {
+        throw new Error(response.reason || 'ONLYOFFICE não configurado.');
+      }
+      const documentServerUrl = normalizeOnlyOfficeDocumentServerUrl(response.documentServerUrl);
+      const url = buildOnlyOfficeStandaloneUrl(documentServerUrl, response.config);
+      if (target) target.location.href = url;
+      else window.location.href = url;
+    } catch (exception) {
+      target?.close();
+      error = exception instanceof Error ? exception.message : 'Não foi possível abrir o ONLYOFFICE.';
+    }
   }
 
   function downloadHref(item: DriveItem) {
@@ -614,6 +643,7 @@
           url={sharedPreviewUrl(token, previewItem.id)}
           canEditText={canEdit}
           canShare={false}
+          autoOpenOfficeEditor={true}
           loadPdfInfo={(id) => getSharedPdfInfo(token, id)}
           loadOfficeConfig={(id, mode = 'view') => getSharedOfficeConfig(token, id, mode)}
           renderPdfPageUrl={(id, page) => Promise.resolve(sharedPdfPageUrl(token, id, page))}

@@ -11,6 +11,41 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       (() => {
+        const staleAssetKey = 'ride:stale-asset-reload';
+        const isStaleAssetError = (value) => {
+          const text = String(value?.message || value?.reason?.message || value?.target?.src || value?.target?.href || value || '');
+          return (
+            text.includes('/_app/immutable/') ||
+            text.includes('Failed to fetch dynamically imported module') ||
+            text.includes('Importing a module script failed') ||
+            text.includes('error loading dynamically imported module')
+          );
+        };
+        const reloadFresh = () => {
+          try {
+            if (sessionStorage.getItem(staleAssetKey)) return;
+            sessionStorage.setItem(staleAssetKey, String(Date.now()));
+            const url = new URL(location.href);
+            url.searchParams.set('_ride_refresh', String(Date.now()));
+            location.replace(url);
+          } catch {
+            location.reload();
+          }
+        };
+        addEventListener('error', (event) => {
+          if (isStaleAssetError(event)) reloadFresh();
+        }, true);
+        addEventListener('unhandledrejection', (event) => {
+          if (isStaleAssetError(event)) reloadFresh();
+        });
+        addEventListener('load', () => {
+          setTimeout(() => {
+            try {
+              sessionStorage.removeItem(staleAssetKey);
+            } catch {}
+          }, 8000);
+        });
+
         try {
           const stored = localStorage.getItem('ride:appearance');
           const appearance = stored === 'dark' || stored === 'system' || stored === 'light' ? stored : 'system';

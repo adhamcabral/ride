@@ -85,7 +85,8 @@
     officeCreateOption,
     type OfficeCreateKind
   } from '$lib/office-create';
-  import { buildOnlyOfficeStandaloneUrl } from '$lib/office-host';
+  import { isOfficeFile } from '$lib/office';
+  import { buildOnlyOfficeStandaloneUrl, normalizeOnlyOfficeDocumentServerUrl } from '$lib/office-host';
   import { getOfflineFile, listOfflineFiles, saveOfflineFile } from '$lib/offline-drive';
   import {
     defaultDrivePreferences,
@@ -2181,6 +2182,13 @@
       void openPdfInNewTab(item, target);
       return;
     }
+    if (shouldOpenOffice(item)) {
+      ctxVisible = false;
+      selectedMenuVisible = false;
+      const target = nativeMobileApp ? null : window.open('about:blank', '_blank');
+      void openOfficeInOnlyOffice(item, target);
+      return;
+    }
     previewItem = item;
     searchPreviewOpen = false;
     searchPreviewItems = [];
@@ -2188,6 +2196,29 @@
     selectedMenuVisible = false;
     pushUrl(item.id);
     void markOpenedInBackground(item);
+  }
+
+  function shouldOpenOffice(item: DriveItem) {
+    if (item.type !== 'file') return false;
+    const extension = (item.extension || item.name.split('.').pop() || '').toLowerCase();
+    return isOfficeFile(extension, item.mimeType || '');
+  }
+
+  async function openOfficeInOnlyOffice(item: DriveItem, target: Window | null) {
+    try {
+      const response = await getOfficeConfig(item.id, 'edit');
+      if (!response.enabled || !response.documentServerUrl || !response.config) {
+        throw new Error(response.reason || 'ONLYOFFICE não configurado.');
+      }
+      const documentServerUrl = normalizeOnlyOfficeDocumentServerUrl(response.documentServerUrl);
+      const url = buildOnlyOfficeStandaloneUrl(documentServerUrl, response.config);
+      if (target) target.location.href = url;
+      else window.location.href = url;
+      void markOpenedInBackground(item);
+    } catch (exception) {
+      target?.close();
+      error = exception instanceof Error ? exception.message : 'Não foi possível abrir o ONLYOFFICE.';
+    }
   }
 
   /** Applies the PDF new-tab preference only for desktop browser sessions. */
@@ -5131,7 +5162,7 @@
           item={previewItem}
           files={previewFiles}
           url={privatePreviewUrl}
-          autoOpenOfficeEditor={nativeMobileApp}
+          autoOpenOfficeEditor={true}
           on:close={() => {
             previewItem = null;
             pushUrl(null);

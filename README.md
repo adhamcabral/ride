@@ -67,6 +67,54 @@ Stop:
 npm run docker:down
 ```
 
+## Production Mode
+
+For normal use, prefer production mode after the first configuration is working:
+
+```bash
+npm run prod
+```
+
+Production mode keeps the same local data folder and the same public HTTPS ports, but runs:
+
+```txt
+API  compiled NestJS app
+Web  static Svelte build served by Nginx
+```
+
+That avoids the Vite development server and API watch mode, so CPU and memory usage are lower and static assets are cached/compressed. Open:
+
+```txt
+https://127.0.0.1:3443
+```
+
+Useful commands:
+
+```bash
+npm run prod:ps
+npm run prod:logs
+npm run prod:down
+```
+
+Use `npm run dev` when editing code and `npm run prod` when you want the faster local server. Both modes use `apps/api/data`; switching modes does not reset accounts or files.
+
+## PDF Performance
+
+The in-app PDF reader renders pages on demand. Large PDFs, manga, and scanned books open the first page first, then load nearby pages while you scroll. Rendered pages are cached locally in:
+
+```txt
+apps/api/data/pdf-cache
+```
+
+Tune quality versus speed in `.env`:
+
+```env
+PDF_RENDER_DPI=120
+PDF_RENDER_MAX_BUFFER_MB=64
+```
+
+Higher DPI makes pages sharper but increases CPU, RAM, and load time. `120` is the default for faster large-file previews.
+
 ## HTTPS and Certificates
 
 Ride exposes only two public HTTPS ports by default:

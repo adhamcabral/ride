@@ -142,6 +142,8 @@ const MAX_DESCRIPTION_LENGTH = 25000;
 const MAX_ACTIVITY_EVENTS_PER_ITEM = 80;
 const MAX_NOTIFICATIONS_PER_USER = 200;
 const MAX_ACTIVITY_TEXT_LENGTH = 180;
+const DEFAULT_PDF_RENDER_DPI = 120;
+const DEFAULT_PDF_RENDER_MAX_BUFFER_MB = 64;
 const DEFAULT_BACKUP_INTERVAL_HOURS = 24;
 const DEFAULT_BACKUP_RETENTION_COUNT = 7;
 const BACKUP_SCHEDULER_INTERVAL_MS = 60 * 1000;
@@ -202,10 +204,12 @@ export class FilesService implements OnModuleDestroy {
   private readonly filesDir: string;
   private readonly tempDir: string;
   private readonly backupsDir: string;
+  private readonly pdfCacheDir: string;
   private readonly metadataPath: string;
   private readonly store: DriveStore;
   private mutationQueue = Promise.resolve();
   private readonly pdfToolChecks = new Map<string, Promise<void>>();
+  private readonly pdfPageRenders = new Map<string, Promise<Buffer>>();
   private backupScheduler: NodeJS.Timeout | null = null;
 
   /** Resolves all storage paths from the API working directory and starts maintenance timers. */
@@ -214,6 +218,7 @@ export class FilesService implements OnModuleDestroy {
     this.filesDir = join(this.dataDir, 'objects');
     this.tempDir = join(this.dataDir, 'tmp');
     this.backupsDir = join(this.dataDir, 'backups');
+    this.pdfCacheDir = join(this.dataDir, 'pdf-cache');
     this.metadataPath = join(this.dataDir, 'metadata.json');
     this.store = new DriveStore(this.dataDir);
     this.startBackupScheduler();
@@ -2180,18 +2185,7 @@ export class FilesService implements OnModuleDestroy {
 
     const page = Number(pageInput);
     if (!Number.isInteger(page) || page < 1) throw new BadRequestException('Página inválida.');
-
-    try {
-      await this.ensurePdfTool('pdftocairo');
-      const { stdout } = await execFileAsync(
-        'pdftocairo',
-        ['-png', '-singlefile', '-f', String(page), '-l', String(page), '-r', '144', path, '-'],
-        { encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 }
-      );
-      return Buffer.from(stdout as Buffer);
-    } catch {
-      throw new InternalServerErrorException('Não foi possível renderizar a página do PDF.');
-    }
+    return this.pdfPage(item, path, page);
   }
 
   /** Reads PDF metadata for a file exposed through a shared link. */
@@ -2227,13 +2221,58 @@ export class FilesService implements OnModuleDestroy {
 
     const page = Number(pageInput);
     if (!Number.isInteger(page) || page < 1) throw new BadRequestException('Página inválida.');
+    return this.pdfPage(item, path, page);
+  }
 
+  private pdfDpi(): number {
+    const value = Number(process.env.PDF_RENDER_DPI ?? DEFAULT_PDF_RENDER_DPI);
+    if (!Number.isFinite(value)) return DEFAULT_PDF_RENDER_DPI;
+    return Math.min(180, Math.max(72, Math.round(value)));
+  }
+
+  private pdfBufferLimit(): number {
+    const value = Number(process.env.PDF_RENDER_MAX_BUFFER_MB ?? DEFAULT_PDF_RENDER_MAX_BUFFER_MB);
+    if (!Number.isFinite(value)) return DEFAULT_PDF_RENDER_MAX_BUFFER_MB * 1024 * 1024;
+    return Math.min(256, Math.max(16, Math.round(value))) * 1024 * 1024;
+  }
+
+  private pdfCacheKey(item: DriveItem, page: number, dpi: number): string {
+    return createHash('sha256')
+      .update([item.id, item.checksum ?? '', item.updatedAt, item.size, page, dpi].join('|'))
+      .digest('hex');
+  }
+
+  private async pdfPage(item: DriveItem, path: string, page: number): Promise<Buffer> {
+    const dpi = this.pdfDpi();
+    const key = this.pdfCacheKey(item, page, dpi);
+    const cachePath = join(this.pdfCacheDir, `${key}.png`);
+    const cached = await readFile(cachePath).catch(() => null);
+    if (cached) return cached;
+
+    const current = this.pdfPageRenders.get(key);
+    if (current) return current;
+
+    const render = this.renderPdf(path, page, dpi)
+      .then(async (buffer) => {
+        await mkdir(this.pdfCacheDir, { recursive: true });
+        await writeFile(cachePath, buffer).catch(() => undefined);
+        return buffer;
+      })
+      .finally(() => {
+        this.pdfPageRenders.delete(key);
+      });
+
+    this.pdfPageRenders.set(key, render);
+    return render;
+  }
+
+  private async renderPdf(path: string, page: number, dpi: number): Promise<Buffer> {
     try {
       await this.ensurePdfTool('pdftocairo');
       const { stdout } = await execFileAsync(
         'pdftocairo',
-        ['-png', '-singlefile', '-f', String(page), '-l', String(page), '-r', '144', path, '-'],
-        { encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 }
+        ['-png', '-singlefile', '-f', String(page), '-l', String(page), '-r', String(dpi), path, '-'],
+        { encoding: 'buffer', maxBuffer: this.pdfBufferLimit() }
       );
       return Buffer.from(stdout as Buffer);
     } catch {

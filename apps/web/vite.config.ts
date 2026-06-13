@@ -10,8 +10,26 @@ const onlyOfficeProxy = {
   ws: true
 };
 
+function chunk(id: string) {
+  const path = id.replaceAll('\\', '/');
+  if (!path.includes('/node_modules/')) return;
+  if (path.includes('/xlsx/')) return 'office-xlsx';
+  if (path.includes('/docx/')) return 'office-docx';
+  if (path.includes('/mammoth/')) return 'office-mammoth';
+  if (path.includes('/pptx-preview/') || path.includes('/jszip/')) return 'office-preview';
+  if (path.includes('/@sveltejs/') || path.includes('/svelte/')) return 'svelte';
+  return 'vendor';
+}
+
 export default defineConfig({
   plugins: [sveltekit()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: chunk
+      }
+    }
+  },
   server: {
     port: 5173,
     proxy: {

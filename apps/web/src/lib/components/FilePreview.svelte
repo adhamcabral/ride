@@ -60,6 +60,11 @@
   let pdfPageHeight = 494;
   let pdfPageUrls: string[] = [];
   let pdfObjectUrls: string[] = [];
+  let pdfPageStates: PdfPageState[] = [];
+  let pdfQueue: number[] = [];
+  let pdfActiveLoads = 0;
+  let pdfObserver: IntersectionObserver | null = null;
+  let pdfScrollFrame: number | null = null;
   let lastLoadedId = '';
   let objectUrl = '';
   let imageLoading = false;
@@ -142,11 +147,16 @@
   const PDF_MIN_ZOOM = 25;
   const PDF_MAX_ZOOM = 800;
   const PDF_ZOOM_STEP = 25;
+  const PDF_MAX_ACTIVE_LOADS = 2;
+  const PDF_PRELOAD_BEFORE = 1;
+  const PDF_PRELOAD_AFTER = 5;
+  const SCROLLBAR_HIT_SIZE = 28;
   const PREVIEW_MIN_ZOOM = 50;
   const PREVIEW_MAX_ZOOM = 600;
   const PREVIEW_ZOOM_STEP = 25;
 
   type SheetCellSnapshot = { row: number; column: number; value: string };
+  type PdfPageState = 'idle' | 'loading' | 'ready' | 'error';
   type PdfZoomAnchor = { pageNumber: number; xRatio: number; yRatio: number } | null;
   type ImageZoomAnchor = { xRatio: number; yRatio: number; viewportX: number; viewportY: number } | null;
   type SheetHistoryEntry = {
@@ -309,9 +319,10 @@
   /** Routes each preview type to the least lossy browser print path. */
   function printCurrentFile() {
     if (kind === 'pdf') {
-      if (pdfPageUrls.length) {
+      const readyPages = pdfPageUrls.filter(Boolean);
+      if (pageCount && readyPages.length === pageCount) {
         printDocument(
-          `${pdfPageUrls
+          `${readyPages
             .map((source) => `<section class="print-page"><img src="${escapeHtml(source)}" alt="" /></section>`)
             .join('')}${printWhenReadyScript()}`,
           '@page { margin: 0; }'
@@ -506,9 +517,17 @@
 
   /** Revokes generated PDF page URLs and clears page-rendering state. */
   function cleanupPdf() {
+    pdfLoadRun += 1;
     if (pdfHost) pdfHost.innerHTML = '';
+    pdfObserver?.disconnect();
+    pdfObserver = null;
+    if (pdfScrollFrame != null) cancelAnimationFrame(pdfScrollFrame);
+    pdfScrollFrame = null;
     for (const objectUrl of pdfObjectUrls) URL.revokeObjectURL(objectUrl);
     pdfObjectUrls = [];
+    pdfPageStates = [];
+    pdfQueue = [];
+    pdfActiveLoads = 0;
     pdfLoading = false;
     firstPdfPageReady = false;
     pdfPageUrls = [];
@@ -521,12 +540,126 @@
     if (!response.ok) throw new Error('Falha ao renderizar página do PDF.');
     const blob = await response.blob();
     if (!blob.type.startsWith('image/')) throw new Error('Resposta inválida ao renderizar PDF.');
-    const objectUrl = URL.createObjectURL(blob);
-    pdfObjectUrls = [...pdfObjectUrls, objectUrl];
-    return objectUrl;
+    return URL.createObjectURL(blob);
   }
 
-  /** Loads PDF metadata first, then renders pages incrementally for responsive preview startup. */
+  function setPdfState(pageNumber: number, state: PdfPageState) {
+    const index = pageNumber - 1;
+    if (index < 0 || index >= pdfPageStates.length) return;
+    const next = [...pdfPageStates];
+    next[index] = state;
+    pdfPageStates = next;
+  }
+
+  function setPdfUrl(pageNumber: number, source: string) {
+    const index = pageNumber - 1;
+    if (index < 0 || index >= pdfPageUrls.length) return;
+    const previous = pdfPageUrls[index];
+    if (previous && previous !== source) URL.revokeObjectURL(previous);
+    const next = [...pdfPageUrls];
+    next[index] = source;
+    pdfPageUrls = next;
+    pdfObjectUrls = [...pdfObjectUrls, source];
+  }
+
+  function shouldLoadPdfPage(pageNumber: number, retry = false) {
+    if (!pageCount || pageNumber < 1 || pageNumber > pageCount) return;
+    const state = pdfPageStates[pageNumber - 1];
+    if (state === 'ready' || state === 'loading') return;
+    if (state === 'error' && !retry) return;
+    return true;
+  }
+
+  function queuePdfPage(pageNumber: number, retry = false) {
+    if (!shouldLoadPdfPage(pageNumber, retry) || pdfQueue.includes(pageNumber)) return;
+    pdfQueue = [...pdfQueue, pageNumber];
+    pumpPdfQueue();
+  }
+
+  function pdfWindow(centerPage: number) {
+    if (!pageCount) return;
+    const start = Math.max(1, centerPage - PDF_PRELOAD_BEFORE);
+    const end = Math.min(pageCount, centerPage + PDF_PRELOAD_AFTER);
+    const nextPages = [centerPage];
+    for (let nextPage = centerPage + 1; nextPage <= end; nextPage += 1) nextPages.push(nextPage);
+    for (let nextPage = centerPage - 1; nextPage >= start; nextPage -= 1) nextPages.push(nextPage);
+    return nextPages;
+  }
+
+  function queuePdfWindow(centerPage: number, priority = false) {
+    const nextPages = pdfWindow(centerPage);
+    if (!nextPages) return;
+    const pending = nextPages.filter((nextPage) => shouldLoadPdfPage(nextPage));
+    if (!pending.length) return;
+    pdfQueue = priority
+      ? [...pending, ...pdfQueue.filter((nextPage) => !pending.includes(nextPage))]
+      : [...pdfQueue, ...pending.filter((nextPage) => !pdfQueue.includes(nextPage))];
+    pumpPdfQueue();
+  }
+
+  function pumpPdfQueue() {
+    if (!pageCount || pdfActiveLoads >= PDF_MAX_ACTIVE_LOADS) return;
+    const pageNumber = pdfQueue[0];
+    if (!pageNumber) return;
+    pdfQueue = pdfQueue.slice(1);
+
+    const run = pdfLoadRun;
+    pdfActiveLoads += 1;
+    setPdfState(pageNumber, 'loading');
+
+    loadPdfPageObjectUrl(item.id, pageNumber, abortController?.signal)
+      .then((source) => {
+        if (run !== pdfLoadRun) {
+          URL.revokeObjectURL(source);
+          return;
+        }
+        setPdfUrl(pageNumber, source);
+        setPdfState(pageNumber, 'ready');
+        if (pageNumber === 1) firstPdfPageReady = true;
+      })
+      .catch((error) => {
+        if (run !== pdfLoadRun || (error as Error).name === 'AbortError') return;
+        setPdfState(pageNumber, 'error');
+        if (pageNumber === 1) {
+          firstPdfPageReady = true;
+          pdfError = 'Não foi possível renderizar a primeira página do PDF.';
+        }
+      })
+      .finally(() => {
+        if (run === pdfLoadRun) {
+          pdfActiveLoads = Math.max(0, pdfActiveLoads - 1);
+          pumpPdfQueue();
+        }
+      });
+
+    pumpPdfQueue();
+  }
+
+  async function observePdfPages() {
+    pdfObserver?.disconnect();
+    pdfObserver = null;
+    await tick();
+    if (!pdfScroll || !pdfHost || !pageCount) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      queuePdfWindow(page, true);
+      return;
+    }
+
+    pdfObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const pageNumber = Number((entry.target as HTMLElement).dataset.page ?? '1');
+          queuePdfWindow(pageNumber);
+        }
+      },
+      { root: pdfScroll, rootMargin: '1400px 0px', threshold: 0.01 }
+    );
+
+    for (const entry of pdfHost.querySelectorAll<HTMLDivElement>('.pdf-page-shell')) pdfObserver.observe(entry);
+  }
+
+  /** Loads PDF metadata first, then renders only visible/nearby pages for responsive startup. */
   async function loadPdfDocument() {
     const run = ++pdfLoadRun;
     pdfLoading = true;
@@ -539,18 +672,17 @@
       pdfPageWidth = Math.round((info.width ?? 612) * 1.35);
       pdfPageHeight = Math.round((info.height ?? 792) * 1.35);
       zoom = defaultPdfZoom();
-      const urls = await Promise.all(
-        Array.from({ length: info.pages }, (_, index) =>
-          loadPdfPageObjectUrl(item.id, index + 1, abortController?.signal)
-        )
-      );
-      if (run !== pdfLoadRun) return;
-      pdfPageUrls = urls;
       pageCount = info.pages;
+      pdfPageUrls = Array.from({ length: info.pages }, () => '');
+      pdfPageStates = Array.from({ length: info.pages }, () => 'idle');
+      if (run !== pdfLoadRun) return;
+      pdfLoading = false;
+      queuePdfWindow(1);
+      void observePdfPages();
     } catch (error) {
       if ((error as Error).name !== 'AbortError') pdfError = 'Não foi possível carregar o PDF.';
     } finally {
-      if (run === pdfLoadRun) pdfLoading = false;
+      if (run === pdfLoadRun && !pageCount) pdfLoading = false;
     }
   }
 
@@ -676,7 +808,7 @@
     officePresentationLines = preview.lines;
   }
 
-  /** Opens the full ONLYOFFICE editor, falling back to the local editor if remote config fails. */
+  /** Opens the full ONLYOFFICE editor. Office files no longer fall back to the local lightweight editor. */
   async function openFullOfficeEditor() {
     if (kind !== 'office') return;
     const run = ++fullOfficeRun;
@@ -697,7 +829,7 @@
       }
       if (!response.enabled || !response.documentServerUrl || !response.config) {
         standaloneWindow?.close();
-        openLocalOfficeFallback(response.reason || 'ONLYOFFICE não configurado.');
+        showOnlyOfficeError(response.reason || 'ONLYOFFICE não configurado.');
         return;
       }
 
@@ -720,11 +852,11 @@
         closeFullOfficeEditor(false);
         return;
       }
-      openLocalOfficeFallback('O navegador bloqueou a nova aba do ONLYOFFICE.');
+      showOnlyOfficeError('O navegador bloqueou a nova aba do ONLYOFFICE.');
     } catch (error) {
       standaloneWindow?.close();
       if (run !== fullOfficeRun) return;
-      openLocalOfficeFallback(error instanceof Error ? error.message : 'Não foi possível abrir o ONLYOFFICE.');
+      showOnlyOfficeError(error instanceof Error ? error.message : 'Não foi possível abrir o ONLYOFFICE.');
     }
   }
 
@@ -761,26 +893,19 @@
     );
   }
 
-  /** Falls back to local preview/editing when the full editor cannot become ready. */
-  function openLocalOfficeFallback(reason?: string) {
+  function showOnlyOfficeError(reason?: string) {
     clearOnlyOfficeReadyTimer();
-    fullOfficeMode = 'local';
+    fullOfficeMode = 'onlyoffice';
     fullOfficeLoading = false;
-    fullOfficeError = '';
-    fullOfficeStatus = reason
-      ? `Editor local ativo: ${reason}`
-      : officeCanSave
-        ? 'Editor local com salvamento no Ride'
-        : 'Visualização local';
+    fullOfficeError = reason || 'Não foi possível abrir o ONLYOFFICE.';
+    fullOfficeStatus = '';
   }
 
   function startOnlyOfficeReadyTimer(run: number) {
     clearOnlyOfficeReadyTimer();
     fullOfficeReadyTimer = setTimeout(() => {
       if (run !== fullOfficeRun || fullOfficeMode !== 'onlyoffice' || !fullOfficeOpen) return;
-      openLocalOfficeFallback(
-        'O ONLYOFFICE carregou, mas não concluiu a abertura do documento. O editor local foi ativado automaticamente.'
-      );
+      showOnlyOfficeError('O ONLYOFFICE carregou, mas não concluiu a abertura do documento.');
     }, 20000);
   }
 
@@ -2004,6 +2129,15 @@
     page = bestPage;
   }
 
+  function handlePdfScroll() {
+    if (pdfScrollFrame != null) return;
+    pdfScrollFrame = requestAnimationFrame(() => {
+      pdfScrollFrame = null;
+      updateVisiblePage();
+      queuePdfWindow(page, true);
+    });
+  }
+
   function close() {
     if (fullOfficeOpen) {
       closeFullOfficeEditor();
@@ -2018,11 +2152,32 @@
     pointerStartedOnBackdrop = false;
   }
 
-  function backdropPointerDown() {
+  function isScrollbarPointer(event: PointerEvent) {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) return false;
+    const rect = target.getBoundingClientRect();
+    const hasVertical = target.scrollHeight > target.clientHeight;
+    const hasHorizontal = target.scrollWidth > target.clientWidth;
+    const verticalScrollbar = Math.max(target.offsetWidth - target.clientWidth, SCROLLBAR_HIT_SIZE);
+    const horizontalScrollbar = Math.max(target.offsetHeight - target.clientHeight, SCROLLBAR_HIT_SIZE);
+    const onVertical = hasVertical && event.clientX >= rect.right - verticalScrollbar;
+    const onHorizontal = hasHorizontal && event.clientY >= rect.bottom - horizontalScrollbar;
+    return onVertical || onHorizontal;
+  }
+
+  function backdropPointerDown(event: PointerEvent) {
+    if (isScrollbarPointer(event)) {
+      pointerStartedOnBackdrop = false;
+      return;
+    }
     pointerStartedOnBackdrop = true;
   }
 
-  function backdropPointerUp() {
+  function backdropPointerUp(event: PointerEvent) {
+    if (isScrollbarPointer(event)) {
+      pointerStartedOnBackdrop = false;
+      return;
+    }
     if (!pointerStartedOnBackdrop) return;
     pointerStartedOnBackdrop = false;
     close();
@@ -2097,6 +2252,7 @@
     const target = pdfHost?.querySelector<HTMLDivElement>(`[data-page="${pageNumber}"]`);
     if (!target) return;
     page = pageNumber;
+    queuePdfWindow(pageNumber, true);
     target.scrollIntoView({ block: 'start', inline: 'center', behavior: 'smooth' });
   }
 
@@ -2307,6 +2463,8 @@
     {#if previousItem}
       <button
         class="absolute left-3 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-[#111315] text-white hover:bg-[#202124]"
+        on:pointerdown|stopPropagation={markContentPointer}
+        on:pointerup|stopPropagation
         on:click={previous}
         aria-label="Arquivo anterior"
       >
@@ -2319,6 +2477,8 @@
     {#if nextItem}
       <button
         class="absolute right-3 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-[#111315] text-white hover:bg-[#202124]"
+        on:pointerdown|stopPropagation={markContentPointer}
+        on:pointerup|stopPropagation
         on:click={next}
         aria-label="Próximo arquivo"
       >
@@ -2336,7 +2496,7 @@
         role="presentation"
         on:pointerdown={backdropPointerDown}
         on:pointerup={backdropPointerUp}
-        on:scroll={updateVisiblePage}
+        on:scroll={handlePdfScroll}
       >
         {#if pdfRawPreviewUrl}
           <iframe
@@ -2375,22 +2535,36 @@
                 on:pointerdown|stopPropagation={markContentPointer}
                 on:pointerup|stopPropagation
               >
-                <img
-                  src={pdfPageUrls[index] ?? ''}
-                  alt=""
-                  draggable="false"
-                  loading={pageNumber <= 2 ? 'eager' : 'lazy'}
-                  class="w-full select-none bg-white object-contain"
-                  on:load={() => {
-                    if (pageNumber === 1) firstPdfPageReady = true;
-                  }}
-                  on:error={() => {
-                    if (pageNumber === 1) {
-                      firstPdfPageReady = true;
-                      pdfError = 'Não foi possível renderizar a primeira página do PDF.';
-                    }
-                  }}
-                />
+                {#if pdfPageUrls[index]}
+                  <img
+                    src={pdfPageUrls[index]}
+                    alt=""
+                    draggable="false"
+                    loading={pageNumber <= 2 ? 'eager' : 'lazy'}
+                    class="w-full select-none bg-white object-contain"
+                    on:load={() => {
+                      if (pageNumber === 1) firstPdfPageReady = true;
+                    }}
+                    on:error={() => {
+                      setPdfState(pageNumber, 'error');
+                      if (pageNumber === 1) {
+                        firstPdfPageReady = true;
+                        pdfError = 'Não foi possível renderizar a primeira página do PDF.';
+                      }
+                    }}
+                  />
+                {:else if pdfPageStates[index] === 'error'}
+                  <button
+                    class="rounded-full bg-[#202124] px-4 py-2 text-[13px] font-medium text-white shadow"
+                    on:click|stopPropagation={() => queuePdfPage(pageNumber, true)}
+                  >
+                    Tentar página {pageNumber} de novo
+                  </button>
+                {:else}
+                  <div class="rounded-full bg-[#202124]/85 px-4 py-2 text-[13px] text-white">
+                    {pdfPageStates[index] === 'loading' ? `Carregando página ${pageNumber}...` : `Página ${pageNumber}`}
+                  </div>
+                {/if}
               </div>
             {/each}
           {/if}
@@ -2694,9 +2868,9 @@
                 <div class="mt-2 text-[14px] leading-5 text-[#bdc1c6]">{fullOfficeError}</div>
                 <button
                   class="mt-5 rounded-full bg-[#0b79d0] px-5 py-2 text-[15px] font-medium hover:bg-[#096fbe]"
-                  on:click={() => openLocalOfficeFallback(fullOfficeError)}
+                  on:click={openFullOfficeEditor}
                 >
-                  Usar editor local
+                  Tentar novamente
                 </button>
               </div>
             </div>
