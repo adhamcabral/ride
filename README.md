@@ -29,31 +29,96 @@ cp .env.example .env
 npm run dev
 ```
 
-The first start downloads the local ONLYOFFICE Docs Docker image if it is not already available. Ride keeps ONLYOFFICE running locally in Docker; the large image archive is not committed to Git.
+The first start tries to generate a local HTTPS certificate, downloads the local ONLYOFFICE Docs Docker image if it is not already available, and starts the Docker stack. Ride keeps ONLYOFFICE running locally in Docker; the large image archive is not committed to Git.
 On a clean Docker install, the stack also prepares Docker volumes for `node_modules` before starting the Web and API containers.
 
 Open:
 
 ```txt
-http://127.0.0.1:5173
+https://127.0.0.1:3443
 ```
 
-For LAN or domain access, edit `.env` before starting:
+The default certificate is self-signed, so browsers will show a trust warning until you trust or replace the certificate.
+If certificate generation fails, `npm run dev` continues in HTTP fallback mode at `http://127.0.0.1:5173`.
+
+For LAN or domain access, edit `.env` before starting and include every hostname/IP that browsers will use:
 
 ```env
-PUBLIC_APP_URL=http://your-domain-or-ip:5173
-PUBLIC_API_URL=http://your-domain-or-ip:3333/api
-VITE_API_URL=http://your-domain-or-ip:3333/api
-CORS_ORIGINS=http://your-domain-or-ip:5173
-ONLYOFFICE_DOCUMENT_SERVER_URL=http://your-domain-or-ip:8082
+RIDE_HTTPS_HOSTS=your-domain-or-ip,localhost,127.0.0.1
+PUBLIC_APP_URL=https://your-domain-or-ip:3443
+PUBLIC_API_URL=https://your-domain-or-ip:3443/api
+VITE_API_URL=/api
+CORS_ORIGINS=https://your-domain-or-ip:3443,https://127.0.0.1:3443,https://localhost:3443
+ONLYOFFICE_DOCUMENT_SERVER_URL=https://your-domain-or-ip:8443
 RIDE_ACCESS_TICKET_SECRET=change-this
 ONLYOFFICE_JWT_SECRET=change-this-too
+```
+
+Then regenerate the certificate:
+
+```bash
+FORCE_RENEW=1 npm run https:certs
+npm run dev
 ```
 
 Stop:
 
 ```bash
 npm run docker:down
+```
+
+## HTTPS and Certificates
+
+Ride exposes only two public HTTPS ports by default:
+
+```txt
+3443  Ride Web + API
+8443  ONLYOFFICE Docs
+```
+
+The Docker-only development ports stay bound to localhost:
+
+```txt
+5173  Web dev server
+3333  API
+8082  ONLYOFFICE HTTP
+```
+
+If the HTTPS certificate cannot be generated or validated, Ride skips the HTTPS proxy and starts only the fallback ports above. Fix OpenSSL/certificate configuration and run `npm run dev` again to return to HTTPS mode.
+
+For router or firewall access, forward only:
+
+```txt
+3443/tcp
+8443/tcp
+```
+
+The generated certificate files live in:
+
+```txt
+docker/proxy/certs/ride-local.crt
+docker/proxy/certs/ride-local.key
+```
+
+They are ignored by Git. To renew the local certificate manually:
+
+```bash
+FORCE_RENEW=1 npm run https:certs
+docker compose restart proxy
+```
+
+If you change domains, LAN IPs, or HTTPS ports, update `.env`, regenerate the certificate, and restart the stack:
+
+```bash
+FORCE_RENEW=1 npm run https:certs
+npm run docker:down
+npm run dev
+```
+
+For a publicly trusted certificate, place your certificate and private key in `docker/proxy/certs`, point `RIDE_TLS_CERT_FILE` and `RIDE_TLS_KEY_FILE` to those filenames, and set:
+
+```env
+RIDE_SKIP_CERT_GENERATION=true
 ```
 
 ## First Account and Local Data
@@ -75,17 +140,18 @@ npm run docker:vendor-office
 ## Ports
 
 ```txt
-5173  Web
-3333  API
-8082  ONLYOFFICE
+3443  HTTPS Web + API
+8443  HTTPS ONLYOFFICE
+5173  Web localhost fallback
+3333  API localhost fallback
+8082  ONLYOFFICE localhost fallback
 ```
 
 UFW:
 
 ```bash
-sudo ufw allow 5173/tcp
-sudo ufw allow 3333/tcp
-sudo ufw allow 8082/tcp
+sudo ufw allow 3443/tcp
+sudo ufw allow 8443/tcp
 ```
 
 ## Backup Volume

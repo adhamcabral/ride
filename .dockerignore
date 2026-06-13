@@ -6,6 +6,7 @@ apps/web/.svelte-kit
 apps/web/build
 docker/onlyoffice/vendor/*.tar
 docker/onlyoffice/vendor/*.tar.*
+docker/proxy/certs/*
 .git
 .env
 npm-debug.log*

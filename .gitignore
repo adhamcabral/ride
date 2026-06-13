@@ -75,6 +75,8 @@ docker/onlyoffice/logs/
 docker/onlyoffice/cache/
 docker/onlyoffice/vendor/*
 !docker/onlyoffice/vendor/.gitkeep
+docker/proxy/certs/*
+!docker/proxy/certs/.gitkeep
 
 # OS, editor, and local agent files
 .DS_Store

@@ -1,7 +1,7 @@
 const SERVER_URL_KEY = 'ride:server-url';
 
-const DEFAULT_API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333/api';
-const DEFAULT_WEB_PORT = import.meta.env.VITE_WEB_PORT ?? '5173';
+const DEFAULT_API_URL = import.meta.env.VITE_API_URL ?? '/api';
+const DEFAULT_WEB_PORT = import.meta.env.VITE_WEB_PORT ?? '3443';
 
 function canUseStorage() {
   return typeof localStorage !== 'undefined';
@@ -9,6 +9,16 @@ function canUseStorage() {
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '');
+}
+
+function isAbsoluteHttpUrl(value: string) {
+  return /^https?:\/\//i.test(value);
+}
+
+function currentOrigin() {
+  if (typeof window === 'undefined') return '';
+  const origin = window.location.origin;
+  return origin && !origin.startsWith('capacitor://') ? trimTrailingSlash(origin) : '';
 }
 
 export function isNativeMobileApp() {
@@ -47,6 +57,7 @@ export function getConfiguredDriveServerUrl() {
 }
 
 function isLoopbackServerUrl(value: string) {
+  if (!isAbsoluteHttpUrl(value)) return true;
   try {
     const hostname = new URL(value).hostname;
     return ['127.0.0.1', 'localhost', '::1'].includes(hostname);
@@ -62,12 +73,19 @@ export function hasConfiguredDriveServerUrl() {
 }
 
 export function getApiUrl() {
-  if (isNativeMobileApp()) return getConfiguredDriveServerUrl() ?? trimTrailingSlash(DEFAULT_API_URL);
+  if (isNativeMobileApp()) {
+    const configured = getConfiguredDriveServerUrl();
+    if (configured) return configured;
+    return isAbsoluteHttpUrl(DEFAULT_API_URL) ? trimTrailingSlash(DEFAULT_API_URL) : '';
+  }
   return trimTrailingSlash(DEFAULT_API_URL);
 }
 
 export function getDriveServerDisplayUrl() {
-  return getApiUrl().replace(/\/api$/, '');
+  const apiUrl = getApiUrl();
+  const displayUrl = apiUrl.replace(/\/api$/, '');
+  if (displayUrl.startsWith('/')) return `${currentOrigin()}${displayUrl === '/' ? '' : displayUrl}`;
+  return displayUrl || currentOrigin();
 }
 
 export function getPublicAppUrl() {

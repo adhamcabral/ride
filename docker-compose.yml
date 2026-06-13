@@ -1,4 +1,29 @@
 services:
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: ride-proxy
+    profiles:
+      - https
+    restart: unless-stopped
+    environment:
+      RIDE_TLS_CERT_FILE: ${RIDE_TLS_CERT_FILE:-ride-local.crt}
+      RIDE_TLS_KEY_FILE: ${RIDE_TLS_KEY_FILE:-ride-local.key}
+      RIDE_HTTPS_PORT: ${RIDE_HTTPS_PORT:-3443}
+      ONLYOFFICE_HTTPS_PORT: ${ONLYOFFICE_HTTPS_PORT:-8443}
+    ports:
+      - "${RIDE_HTTPS_BIND_ADDRESS:-0.0.0.0}:${RIDE_HTTPS_PORT:-3443}:3443"
+      - "${ONLYOFFICE_HTTPS_BIND_ADDRESS:-0.0.0.0}:${ONLYOFFICE_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ./docker/proxy/templates:/etc/nginx/templates:ro
+      - ./docker/proxy/certs:/etc/nginx/certs:ro
+    depends_on:
+      web:
+        condition: service_started
+      api:
+        condition: service_started
+      onlyoffice:
+        condition: service_started
+
   deps:
     build:
       context: .
@@ -39,7 +64,7 @@ services:
       OFFICE_CALLBACK_MAX_BYTES: ${OFFICE_CALLBACK_MAX_BYTES:-268435456}
       CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "${API_HOST_PORT:-3333}:3333"
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_HOST_PORT:-3333}:3333"
     volumes:
       - .:/workspace
       - ride-node-modules:/workspace/node_modules
@@ -71,7 +96,7 @@ services:
       VITE_ONLYOFFICE_PROXY_TARGET: ${DOCKER_ONLYOFFICE_PROXY_TARGET:-http://onlyoffice}
       CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "${WEB_HOST_PORT:-5173}:5173"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_HOST_PORT:-5173}:5173"
     volumes:
       - .:/workspace
       - ride-node-modules:/workspace/node_modules
@@ -99,7 +124,7 @@ services:
       ALLOW_PRIVATE_IP_ADDRESS: "${ONLYOFFICE_ALLOW_PRIVATE_IP:-true}"
       ALLOW_META_IP_ADDRESS: "${ONLYOFFICE_ALLOW_META_IP:-true}"
     ports:
-      - "${ONLYOFFICE_PORT:-8082}:80"
+      - "${ONLYOFFICE_BIND_ADDRESS:-127.0.0.1}:${ONLYOFFICE_PORT:-8082}:80"
     volumes:
       - onlyoffice-data:/var/www/onlyoffice/Data
       - onlyoffice-logs:/var/log/onlyoffice

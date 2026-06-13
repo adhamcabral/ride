@@ -1,0 +1,80 @@
+map $http_upgrade $ride_connection_upgrade {
+  default upgrade;
+  '' close;
+}
+
+server {
+  listen 3443 ssl;
+  http2 on;
+  server_name _;
+
+  ssl_certificate /etc/nginx/certs/${RIDE_TLS_CERT_FILE};
+  ssl_certificate_key /etc/nginx/certs/${RIDE_TLS_KEY_FILE};
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers off;
+  ssl_session_cache shared:RideSSL:10m;
+  ssl_session_timeout 1d;
+
+  client_max_body_size 1024m;
+  proxy_http_version 1.1;
+  proxy_read_timeout 3600s;
+  proxy_send_timeout 3600s;
+
+  location /api/ {
+    proxy_pass http://api:3333;
+    proxy_set_header Host $host:${RIDE_HTTPS_PORT};
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host:${RIDE_HTTPS_PORT};
+    proxy_set_header X-Forwarded-Port ${RIDE_HTTPS_PORT};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $ride_connection_upgrade;
+  }
+
+  location / {
+    proxy_pass http://web:5173;
+    proxy_set_header Host $host:${RIDE_HTTPS_PORT};
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host:${RIDE_HTTPS_PORT};
+    proxy_set_header X-Forwarded-Port ${RIDE_HTTPS_PORT};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $ride_connection_upgrade;
+    proxy_buffering off;
+  }
+}
+
+server {
+  listen 8443 ssl;
+  http2 on;
+  server_name _;
+
+  ssl_certificate /etc/nginx/certs/${RIDE_TLS_CERT_FILE};
+  ssl_certificate_key /etc/nginx/certs/${RIDE_TLS_KEY_FILE};
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers off;
+  ssl_session_cache shared:RideOfficeSSL:10m;
+  ssl_session_timeout 1d;
+
+  client_max_body_size 1024m;
+  proxy_http_version 1.1;
+  proxy_read_timeout 3600s;
+  proxy_send_timeout 3600s;
+  proxy_request_buffering off;
+
+  location / {
+    proxy_pass http://onlyoffice:80;
+    proxy_set_header Host $host:${ONLYOFFICE_HTTPS_PORT};
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host:${ONLYOFFICE_HTTPS_PORT};
+    proxy_set_header X-Forwarded-Port ${ONLYOFFICE_HTTPS_PORT};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $ride_connection_upgrade;
+    proxy_redirect http://$host/ https://$host:${ONLYOFFICE_HTTPS_PORT}/;
+    proxy_redirect https://$host/ https://$host:${ONLYOFFICE_HTTPS_PORT}/;
+  }
+}
