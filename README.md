@@ -69,6 +69,14 @@ For Android, the app uses the API and ONLYOFFICE directly over HTTP to avoid loc
 
 The app completes the API as `http://192.168.1.199:3333/api` and opens ONLYOFFICE inside the app through `http://192.168.1.199:8082`. Do not use `127.0.0.1` on the phone because it points to the phone itself.
 
+For ONLYOFFICE editing from PC and Android at the same time, make the API URL sent to ONLYOFFICE reachable from both the browser and the Document Server container:
+
+```env
+DOCKER_PUBLIC_API_URL=http://192.168.1.199:3333/api
+ONLYOFFICE_DOCUMENT_SERVER_URL=http://192.168.1.199:8082
+CORS_ORIGINS=https://192.168.1.199:3443,http://192.168.1.199:8082,https://192.168.1.199:8443,http://192.168.1.199:3333
+```
+
 Stop:
 
 ```bash
