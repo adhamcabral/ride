@@ -26,7 +26,7 @@
     "prod:ps": "docker compose -f docker-compose.prod.yml --profile https ps",
     "admin:promote": "node scripts/promote-admin.js",
     "mobile:init": "npx cap add android",
-    "mobile:sync": "PUBLIC_API_URL= VITE_API_URL= VITE_WEB_PORT=3443 VITE_NATIVE_API_PORT=3333 NODE_OPTIONS=--max-old-space-size=1024 npm run build -w @ride/web && NODE_OPTIONS=--max-old-space-size=1024 npx cap sync android",
+    "mobile:sync": "PUBLIC_API_URL= VITE_API_URL= VITE_WEB_PORT=3443 VITE_NATIVE_API_PORT=3333 VITE_NATIVE_ONLYOFFICE_PORT=8082 NODE_OPTIONS=--max-old-space-size=1024 npm run build -w @ride/web && NODE_OPTIONS=--max-old-space-size=1024 npx cap sync android",
     "mobile:apk": "npm run mobile:sync && cd android && JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk} ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk} ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-/opt/android-sdk} ./gradlew --no-daemon --max-workers=1 assembleDebug",
     "build": "npm run build -w @ride/api && npm run build -w @ride/web",
     "test": "npm run test -w @ride/api",

@@ -2185,6 +2185,14 @@
     if (shouldOpenOffice(item)) {
       ctxVisible = false;
       selectedMenuVisible = false;
+      if (nativeMobileApp) {
+        previewItem = item;
+        searchPreviewOpen = false;
+        searchPreviewItems = [];
+        pushUrl(item.id);
+        void markOpenedInBackground(item);
+        return;
+      }
       const target = nativeMobileApp ? null : window.open('about:blank', '_blank');
       void openOfficeInOnlyOffice(item, target);
       return;

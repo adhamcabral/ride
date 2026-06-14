@@ -61,13 +61,13 @@ FORCE_RENEW=1 npm run https:certs
 npm run dev
 ```
 
-For Android, the app uses the API directly over HTTP to avoid local certificate setup. Set `API_BIND_ADDRESS=0.0.0.0`, keep `API_HOST_PORT=3333`, restart Ride, then enter the PC LAN address in the app:
+For Android, the app uses the API and ONLYOFFICE directly over HTTP to avoid local certificate setup. Set `API_BIND_ADDRESS=0.0.0.0` and `ONLYOFFICE_BIND_ADDRESS=0.0.0.0`, keep `API_HOST_PORT=3333` and `ONLYOFFICE_PORT=8082`, restart Ride, then enter the PC LAN address in the app:
 
 ```txt
 192.168.1.199
 ```
 
-The app completes that as `http://192.168.1.199:3333/api`. Do not use `127.0.0.1` on the phone because it points to the phone itself.
+The app completes the API as `http://192.168.1.199:3333/api` and opens ONLYOFFICE inside the app through `http://192.168.1.199:8082`. Do not use `127.0.0.1` on the phone because it points to the phone itself.
 
 Stop:
 
@@ -136,6 +136,7 @@ For Android on the same LAN, expose the API HTTP port:
 
 ```txt
 3333  API for Android app
+8082  ONLYOFFICE for Android app
 ```
 
 The Docker-only development ports can stay bound to localhost when Android access is not needed:
@@ -204,8 +205,8 @@ npm run docker:vendor-office
 3443  HTTPS Web + API
 8443  HTTPS ONLYOFFICE
 3333  HTTP API for Android LAN access
+8082  HTTP ONLYOFFICE for Android LAN access
 5173  Web localhost fallback
-8082  ONLYOFFICE localhost fallback
 ```
 
 UFW:
@@ -214,6 +215,7 @@ UFW:
 sudo ufw allow 3443/tcp
 sudo ufw allow 8443/tcp
 sudo ufw allow from 192.168.1.0/24 to any port 3333 proto tcp
+sudo ufw allow from 192.168.1.0/24 to any port 8082 proto tcp
 ```
 
 ## Backup Volume

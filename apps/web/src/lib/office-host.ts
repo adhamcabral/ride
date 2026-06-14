@@ -1,6 +1,16 @@
 const OFFICE_HOST_VERSION = 8;
 const SERVER_URL_KEY = 'ride:server-url';
 const DEFAULT_ONLYOFFICE_PORT = import.meta.env.VITE_ONLYOFFICE_PORT ?? '8082';
+const NATIVE_ONLYOFFICE_PORT = import.meta.env.VITE_NATIVE_ONLYOFFICE_PORT ?? '8082';
+
+function isNativeMobileApp() {
+  if (typeof window === 'undefined') return false;
+  const capacitor = (window as unknown as { Capacitor?: { getPlatform?: () => string; isNativePlatform?: () => boolean } })
+    .Capacitor;
+  if (!capacitor) return false;
+  if (typeof capacitor.isNativePlatform === 'function') return capacitor.isNativePlatform();
+  return typeof capacitor.getPlatform === 'function' && capacitor.getPlatform() !== 'web';
+}
 
 function configuredServerHost() {
   if (typeof localStorage === 'undefined') return '';
@@ -25,6 +35,10 @@ export function normalizeOnlyOfficeDocumentServerUrl(documentServerUrl: string, 
       } else if (host) {
         url.hostname = host;
       }
+    }
+    if (isNativeMobileApp() && url.protocol === 'https:') {
+      url.protocol = 'http:';
+      url.port = NATIVE_ONLYOFFICE_PORT;
     }
     if (!url.port) url.port = DEFAULT_ONLYOFFICE_PORT;
     return url.toString().replace(/\/+$/, '');
