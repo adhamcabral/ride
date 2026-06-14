@@ -32,7 +32,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    allowedHosts: ['adham.com.br'],
+    // For custom-domain dev deployments, set server.allowedHosts to your own domain locally.
     proxy: {
       '/onlyoffice': {
         ...onlyOfficeProxy,
