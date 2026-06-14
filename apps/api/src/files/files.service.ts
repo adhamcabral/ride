@@ -11,7 +11,7 @@ import { execFile } from 'child_process';
 import { createHash, createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import type { Express } from 'express';
 import type {} from 'multer';
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync } from 'fs';
 import { copyFile, link, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, statfs, writeFile } from 'fs/promises';
 import { lookup } from 'mime-types';
 import { basename, dirname, extname, join, resolve } from 'path';
@@ -204,6 +204,7 @@ export class FilesService implements OnModuleDestroy {
   private readonly filesDir: string;
   private readonly tempDir: string;
   private readonly backupsDir: string;
+  private readonly legacyBackupsDir: string;
   private readonly pdfCacheDir: string;
   private readonly metadataPath: string;
   private readonly store: DriveStore;
@@ -217,7 +218,12 @@ export class FilesService implements OnModuleDestroy {
     this.dataDir = join(process.cwd(), process.env.STORAGE_DIR ?? 'data');
     this.filesDir = join(this.dataDir, 'objects');
     this.tempDir = join(this.dataDir, 'tmp');
-    this.backupsDir = join(this.dataDir, 'backups');
+    this.legacyBackupsDir = join(this.dataDir, 'backups');
+    this.backupsDir = resolve(
+      process.env.RIDE_BACKUP_CONTAINER_DIR?.trim() ||
+        (existsSync('/backups') ? '/backups' : process.env.RIDE_BACKUP_DIR?.trim()) ||
+        this.legacyBackupsDir
+    );
     this.pdfCacheDir = join(this.dataDir, 'pdf-cache');
     this.metadataPath = join(this.dataDir, 'metadata.json');
     this.store = new DriveStore(this.dataDir);
@@ -2710,19 +2716,24 @@ export class FilesService implements OnModuleDestroy {
   /** Resolves the primary backup directory, falling back to the original local data path. */
   private normalizeBackupDirectory(path?: string | null): string {
     const value = typeof path === 'string' ? path.trim() : '';
-    return resolve(value || this.backupsDir);
+    const normalized = resolve(value || this.backupsDir);
+    const configuredHostDirectory = process.env.RIDE_BACKUP_DIR?.trim();
+    if (normalized === resolve(this.legacyBackupsDir)) return resolve(this.backupsDir);
+    if (configuredHostDirectory && normalized === resolve(configuredHostDirectory)) return resolve(this.backupsDir);
+    return normalized;
   }
 
   /** Normalizes mirror paths and removes duplicates of primary or legacy backup directories. */
   private normalizeBackupTargetPaths(paths: string[], backupDirectory = this.backupsDir): string[] {
     const primaryDirectory = resolve(backupDirectory);
-    const legacyDirectory = resolve(this.backupsDir);
+    const defaultDirectory = resolve(this.backupsDir);
+    const legacyDirectory = resolve(this.legacyBackupsDir);
     const normalized = paths
       .map((path) => (typeof path === 'string' ? path.trim() : ''))
       .filter(Boolean)
       .map((path) => resolve(path));
     return Array.from(new Set(normalized)).filter(
-      (path) => path !== primaryDirectory && path !== legacyDirectory
+      (path) => path !== primaryDirectory && path !== defaultDirectory && path !== legacyDirectory
     );
   }
 
@@ -3101,7 +3112,12 @@ export class FilesService implements OnModuleDestroy {
   /** Includes the new primary directory and the legacy directory so old backups remain visible. */
   private backupDirectories(schedule: BackupScheduleSettings): string[] {
     return Array.from(
-      new Set([this.normalizeBackupDirectory(schedule.directory), this.backupsDir, ...schedule.targetPaths])
+      new Set([
+        this.normalizeBackupDirectory(schedule.directory),
+        this.backupsDir,
+        this.legacyBackupsDir,
+        ...schedule.targetPaths
+      ])
     );
   }
 
@@ -4323,6 +4339,7 @@ export class FilesService implements OnModuleDestroy {
   private async ensureStorage(): Promise<void> {
     await mkdir(this.filesDir, { recursive: true });
     await mkdir(this.tempDir, { recursive: true });
+    await mkdir(this.backupsDir, { recursive: true });
   }
 
   private async withMutation<T>(operation: () => Promise<T>): Promise<T> {

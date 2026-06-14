@@ -47,6 +47,8 @@ For LAN or domain access, edit `.env` before starting and include every hostname
 RIDE_HTTPS_HOSTS=your-domain-or-ip,localhost,127.0.0.1
 PUBLIC_APP_URL=https://your-domain-or-ip:3443
 PUBLIC_API_URL=https://your-domain-or-ip:3443/api
+# Keep the Document Server download/callback URL on the internal Docker network.
+DOCKER_PUBLIC_API_URL=http://api:3333/api
 VITE_API_URL=/api
 CORS_ORIGINS=https://your-domain-or-ip:3443,https://127.0.0.1:3443,https://localhost:3443
 ONLYOFFICE_DOCUMENT_SERVER_URL=https://your-domain-or-ip:8443

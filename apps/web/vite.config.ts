@@ -32,6 +32,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: ['adham.com.br'],
     proxy: {
       '/onlyoffice': {
         ...onlyOfficeProxy,
