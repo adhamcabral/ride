@@ -9,6 +9,8 @@
 Ride is a self-hosted file manager with users, sharing, search, previews, backups, and ONLYOFFICE editing.
 It runs as a local Docker stack with Web, API, SQLite storage, and ONLYOFFICE Docs.
 Use it as a private Drive-style workspace for files, folders, and office documents.
+
+To install the Android app, please download it from the Releases page.
 </p>
 <hr>
 
