@@ -17,7 +17,6 @@ To install the Android app, please download it from the Releases page.
 
 ## Requirements
 
-- Linux server or desktop
 - Docker and Docker Compose
 - Node.js 24+
 - npm 10+
