@@ -17,11 +17,9 @@ To install the Android app, please download it from the Releases page.
 
 ## Requirements
 
-- Docker and Docker Compose
-- Node.js 24+
-- npm 10+
-- Internet access on first start to pull Docker images
-- Optional: UFW for firewall rules
+- Docker
+- Node.js 24 or later
+- At least 1 GB of RAM
 
 ## Fast Start
 
