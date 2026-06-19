@@ -204,28 +204,7 @@ That folder is ignored by Git. To reset Ride back to first-account setup, stop t
 
 To pre-cache the ONLYOFFICE base image for later local reuse:
 
-```bash
-npm run docker:vendor-office
-```
 
-## Ports
-
-```txt
-3443  HTTPS Web + API
-8443  HTTPS ONLYOFFICE
-3333  HTTP API for Android LAN access
-8082  HTTP ONLYOFFICE for Android LAN access
-5173  Web localhost fallback
-```
-
-UFW:
-
-```bash
-sudo ufw allow 3443/tcp
-sudo ufw allow 8443/tcp
-sudo ufw allow from 192.168.1.0/24 to any port 3333 proto tcp
-sudo ufw allow from 192.168.1.0/24 to any port 8082 proto tcp
-```
 
 ## Backup Volume
 
@@ -236,17 +215,6 @@ sudo mkdir -p /srv/ride-backups
 sudo chown -R "$USER:$USER" /srv/ride-backups
 ```
 
-Set it in `.env`:
-
-```env
-RIDE_BACKUP_DIR=/srv/ride-backups
-```
-
-Start Ride, then go to `Settings > Backups` and set the default backup location to other disk:
-
-```txt
-/backups
-```
 
 ## Author
 
