@@ -104,15 +104,6 @@ That avoids the Vite development server and API watch mode, so CPU and memory us
 ```txt
 https://127.0.0.1:3443
 ```
-
-Useful commands:
-
-```bash
-npm run prod:ps
-npm run prod:logs
-npm run prod:down
-```
-
 Use `npm run dev` when editing code and `npm run prod` when you want the faster local server. Both modes use `apps/api/data`; switching modes does not reset accounts or files.
 
 ## PDF Performance
