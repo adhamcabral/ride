@@ -148,13 +148,6 @@ The Docker-only development ports can stay bound to localhost when Android acces
 
 If the HTTPS certificate cannot be generated or validated, Ride skips the HTTPS proxy and starts only the fallback ports above. Fix OpenSSL/certificate configuration and run `npm run dev` again to return to HTTPS mode.
 
-For router or firewall access, forward only:
-
-```txt
-3443/tcp
-8443/tcp
-```
-
 The generated certificate files live in:
 
 ```txt
